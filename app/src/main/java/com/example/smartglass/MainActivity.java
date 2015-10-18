@@ -1,74 +1,85 @@
 package com.example.smartglass;
 
-import android.hardware.Camera;
+import android.app.Activity;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
-import android.view.View;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.WindowManager;
-
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
-import java.io.IOException;
+public class MainActivity extends Activity implements CameraBridgeViewBase.CvCameraViewListener2 {
+    private CameraBridgeViewBase mCameraView;
+    private Mat mOutputFrame;
 
-public class MainActivity extends AppCompatActivity {
-    //カメラの宣言
-    private Camera camera;
+    private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
+        @Override
+        public void onManagerConnected(int status) {
+            switch (status) {
+                case LoaderCallbackInterface.SUCCESS:
+                    mCameraView.enableView();
+                    break;
+                default:
+                    super.onManagerConnected(status);
+                    break;
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
-        //フルスクリーンの指定
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        //カメラプレビュー画面の設定
-        SurfaceView cameraPreview= (SurfaceView)findViewById(R.id.preview);
-        //サーフェイスホルダー生成
-        cameraPreview.getHolder().addCallback(previewCallback);
-        //サーフェイスホルダーのタイプを設定(外部バッファの使用)
-        cameraPreview.getHolder().setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+        mCameraView = (CameraBridgeViewBase)findViewById(R.id.camera_view);
+        mCameraView.setCvCameraViewListener(this);
     }
 
-    //サーフェイスホルダーの「Callback()」メソッドを実装
-    private SurfaceHolder.Callback previewCallback = new SurfaceHolder.Callback() {
-        private Camera camera;
-        // サーフェイス生成処理
-        public void surfaceCreated(SurfaceHolder holder) {
-            // カメラ初期化
-                    try {
-                        // カメラのオープン
-                        camera = Camera.open();
-                        // プレビューディスプレイのセット
-                        camera.setPreviewDisplay(holder);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+    @Override
+    public void onPause() {
+        if (mCameraView != null) {
+            mCameraView.disableView();
         }
-        // サーフェイス変更処理
-        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-            // プレビューを停止
-            camera.stopPreview();
-            // カメラのパラメータを取得
-            Camera.Parameters params = camera.getParameters();
-            // パラメータにプレビュー表示のサイズを設定
-            params.setPreviewSize(params.getPreviewSize().width, params.getPreviewSize().height);
-            // パラメータのセット
-            camera.setParameters(params);
-            // カメラプレビュー開始
-            camera.startPreview();
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_2_4_11, this, mLoaderCallback);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mCameraView != null) {
+            mCameraView.disableView();
         }
-        // サーフェイス開放処理
-        public void surfaceDestroyed(SurfaceHolder holder) {
-            // カメラプレビュー停止
-            camera.stopPreview();
-            // カメラリリース
-            camera.release();
-        }
-    };
+    }
+
+    @Override
+    public void onCameraViewStarted(int width, int height) {
+        // カメラプレビュー開始時に呼ばれる
+        // Mat(int rows, int cols, int type)
+        // rows(行): height, cols(列): width
+        mOutputFrame = new Mat(height, width, CvType.CV_8UC1);
+    }
+
+    @Override
+    public void onCameraViewStopped() {
+        // カメラプレビュー終了時に呼ばれる
+        mOutputFrame.release();
+    }
+
+    @Override
+    public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        // フレームをキャプチャする毎(30fpsなら毎秒30回)に呼ばれる
+        // Cannyフィルタをかける
+        Imgproc.Canny(inputFrame.gray(), mOutputFrame, 80, 100);
+        // ビット反転
+        Core.bitwise_not(mOutputFrame, mOutputFrame);
+        return mOutputFrame;
+    }
 }
