@@ -12,6 +12,7 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.highgui.Highgui;
 import org.opencv.imgproc.Imgproc;
 
@@ -38,6 +39,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        //プログラム開始時に呼ばれる
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         mCameraView = (CameraBridgeViewBase)findViewById(R.id.camera_view);
@@ -60,6 +62,7 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     @Override
     public void onDestroy() {
+        //プログラム終了時に呼ばれる
         super.onDestroy();
         if (mCameraView != null) {
             mCameraView.disableView();
@@ -85,6 +88,8 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         mOutputFrame.release();
         Frame0.release();
         Frame.release();
+        difb0.release();
+        difb.release();
         dif.release();
     }
 
@@ -98,10 +103,14 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
         Imgproc.threshold(dif, difb, 30, 255, Imgproc.THRESH_BINARY);
         //二値化された差分画像の共通部分を取得
         Core.bitwise_and(difb0, difb, mOutputFrame);
-        //更新
+        new Point();
+        //クロージング・オープニング処理
+        Imgproc.morphologyEx(mOutputFrame, mOutputFrame,  Imgproc.MORPH_OPEN, new Mat(),new Point(-1,-1),2);
+        Imgproc.morphologyEx(mOutputFrame, mOutputFrame,  Imgproc.MORPH_CLOSE, new Mat(),new Point(-1,-1),2);
+        //フレーム更新
         Frame0=Frame;
         difb0=difb;
-
+        //出力
         return mOutputFrame;
     }
 }
